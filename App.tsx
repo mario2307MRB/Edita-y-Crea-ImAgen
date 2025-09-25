@@ -1,8 +1,8 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import { generateImage, summarizeChanges, createImageFromText } from './services/geminiService';
-import type { StyleOption, ResolutionOption } from './types';
-import { STYLE_OPTIONS, RESOLUTION_OPTIONS } from './constants';
+import type { StyleOption } from './types';
+import { STYLE_OPTIONS } from './constants';
 import ImageUploader from './components/ImageUploader';
 import ResultDisplay from './components/ResultDisplay';
 import Loader from './components/Loader';
@@ -28,7 +28,6 @@ const App: React.FC = () => {
   const [summary, setSummary] = useState<string | null>('');
   const [userPrompt, setUserPrompt] = useState<string>('');
   const [selectedStyle, setSelectedStyle] = useState<string>(STYLE_OPTIONS[0].id);
-  const [selectedResolution, setSelectedResolution] = useState<string>(RESOLUTION_OPTIONS[0].id);
   
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +104,6 @@ const App: React.FC = () => {
     setModifiedImageURL(null);
     setUserPrompt('');
     setSelectedStyle(STYLE_OPTIONS[0].id);
-    setSelectedResolution(RESOLUTION_OPTIONS[0].id);
     setSummary('');
     setError(null);
   };
@@ -199,20 +197,6 @@ const App: React.FC = () => {
                         </button>
                       ))}
                     </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <label htmlFor="resolution" className="font-semibold">4. Resolución final (opcional)</label>
-                    <select
-                      id="resolution"
-                      value={selectedResolution}
-                      onChange={(e) => setSelectedResolution(e.target.value)}
-                      className="w-full p-2 rounded-md bg-neutral-700 border border-neutral-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    >
-                      {RESOLUTION_OPTIONS.map((res: ResolutionOption) => (
-                        <option key={res.id} value={res.id}>{res.label}</option>
-                      ))}
-                    </select>
                   </div>
 
                   <button

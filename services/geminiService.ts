@@ -1,104 +1,74 @@
 
-import { GoogleGenAI, Modality, GenerateContentResponse } from "@google/genai";
-
-const API_KEY = process.env.API_KEY;
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
-
-// Helper to convert File to a Gemini Part
-const fileToGenerativePart = async (file: File) => {
-  const base64EncodedDataPromise = new Promise<string>((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-            resolve(reader.result.split(',')[1]);
+// Helper to handle API responses robustly
+const handleApiResponse = async (response: Response) => {
+    if (!response.ok) {
+        // Handle common Vercel errors that might not return JSON
+        if (response.status === 504) {
+            throw new Error(`El servidor ha tardado demasiado en responder (Gateway Timeout). Esto puede ocurrir con peticiones complejas. Por favor, intenta de nuevo.`);
         }
-    };
-    reader.readAsDataURL(file);
-  });
-  return {
-    inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
-  };
-};
+        if (response.status === 413) {
+            throw new Error(`La imagen es demasiado grande. Por favor, sube una imagen más pequeña. (Payload Too Large)`);
+        }
 
-// Generates the modified image
-export const generateImage = async (imageFile: File, prompt: string) => {
-  const imagePart = await fileToGenerativePart(imageFile);
-
-  const response: GenerateContentResponse = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image-preview',
-    contents: {
-      parts: [
-        imagePart,
-        { text: prompt },
-      ],
-    },
-    config: {
-      responseModalities: [Modality.IMAGE, Modality.TEXT],
-    },
-  });
-  
-  const imageOutput = response.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
-
-  if (!imageOutput || !imageOutput.inlineData) {
-    const candidate = response.candidates?.[0];
-    
-    if (candidate?.finishReason === 'SAFETY') {
-      console.error('Request blocked due to safety reasons:', candidate.safetyRatings);
-      throw new Error(`La solicitud fue bloqueada por motivos de seguridad. Por favor, ajusta la descripción o la imagen.`);
+        // Try to parse error from JSON body, otherwise provide a generic error
+        try {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Ocurrió un error desconocido en el servidor.');
+        } catch (e) {
+            throw new Error(`Error de servidor: ${response.status}. No se pudo procesar la respuesta.`);
+        }
     }
-
-    const textOutput = candidate?.content?.parts?.find(part => part.text)?.text;
-    if (textOutput) {
-        console.error('API returned text instead of an image:', textOutput);
-        throw new Error(`La IA respondió con un mensaje en lugar de una imagen: "${textOutput}". Intenta simplificar tu petición.`);
-    }
-
-    console.error("Failed to generate image. Full API response:", JSON.stringify(response, null, 2));
-    throw new Error("No se pudo generar la imagen. La API no devolvió una imagen válida.");
-  }
-  
-  return imageOutput.inlineData;
+    return response.json();
 };
 
-// Generates an image from a text prompt
-export const createImageFromText = async (prompt: string, style: string, aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4') => {
-  const fullPrompt = `Crea una imagen basada en la siguiente descripción: "${prompt}". El estilo debe ser ${style}.`;
-
-  const response = await ai.models.generateImages({
-    model: 'imagen-4.0-generate-001',
-    prompt: fullPrompt,
-    config: {
-      numberOfImages: 1,
-      outputMimeType: 'image/png',
-      aspectRatio: aspectRatio,
-    },
-  });
-
-  const generatedImage = response.generatedImages?.[0];
-
-  if (!generatedImage || !generatedImage.image.imageBytes) {
-    console.error("Failed to create image. Full API response:", JSON.stringify(response, null, 2));
-    throw new Error("No se pudo crear la imagen. La API no devolvió una imagen válida, intenta ser más descriptivo.");
-  }
-  
-  return {
-    data: generatedImage.image.imageBytes,
-    mimeType: 'image/png'
-  };
-};
-
-// Generates a summary of the changes
-export const summarizeChanges = async (prompt: string, style: string): Promise<string> => {
-    const summaryPrompt = `Basado en la siguiente solicitud de edición de imagen: "${prompt}" con un estilo "${style}", resume los cambios que se aplicarían en una frase breve y descriptiva. Ejemplo: "Se mejoró la iluminación, se cambió el fondo a blanco y se aplicó un estilo profesional."`;
-  
-    const response: GenerateContentResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: summaryPrompt
+// Helper to convert File to a base64 string
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+          // result is "data:image/jpeg;base64,LzlqLzRBQ...". We only want the part after the comma.
+          if (typeof reader.result === 'string') {
+              resolve(reader.result.split(',')[1]);
+          } else {
+              reject(new Error("Failed to read file as data URL"));
+          }
+      };
+      reader.onerror = (error) => reject(error);
     });
+  };
   
-    return response.text;
+  export const generateImage = async (imageFile: File, prompt: string) => {
+      const base64Data = await fileToBase64(imageFile);
+      const response = await fetch('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+              action: 'generateImage',
+              image: { data: base64Data, mimeType: imageFile.type },
+              prompt,
+          }),
+      });
+      const result = await handleApiResponse(response);
+      return result.data;
+  };
+  
+  export const createImageFromText = async (prompt: string, style: string, aspectRatio: string) => {
+      const response = await fetch('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'createImage', prompt, style, aspectRatio }),
+      });
+      const result = await handleApiResponse(response);
+      return result.data;
+  };
+  
+  export const summarizeChanges = async (prompt: string, style: string): Promise<string> => {
+      const response = await fetch('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'summarize', prompt, style }),
+      });
+      const result = await handleApiResponse(response);
+      return result.data;
   };

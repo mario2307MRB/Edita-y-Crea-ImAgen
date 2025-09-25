@@ -1,5 +1,5 @@
 
-import type { StyleOption, ResolutionOption, AspectRatioOption } from './types';
+import type { StyleOption, AspectRatioOption } from './types';
 
 export const STYLE_OPTIONS: StyleOption[] = [
   { id: 'realista', label: 'Realista' },
@@ -8,11 +8,11 @@ export const STYLE_OPTIONS: StyleOption[] = [
   { id: 'corporativo', label: 'Corporativo' },
   { id: 'vintage', label: 'Vintage' },
   { id: 'cinematográfico', label: 'Cinematográfico' },
-];
-
-export const RESOLUTION_OPTIONS: ResolutionOption[] = [
-  { id: 'HD (1080p)', label: 'HD (1080p)' },
-  { id: '4K', label: '4K' },
+  { id: 'cyberpunk', label: 'Cyberpunk' },
+  { id: 'fantasia-epica', label: 'Fantasía Épica' },
+  { id: 'acuarela', label: 'Acuarela' },
+  { id: 'dibujo-a-lapiz', label: 'Dibujo a Lápiz' },
+  { id: 'arte-abstracto', label: 'Arte Abstracto' },
 ];
 
 export const ASPECT_RATIO_OPTIONS: AspectRatioOption[] = [
