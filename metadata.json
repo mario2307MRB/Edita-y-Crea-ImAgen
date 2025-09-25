@@ -1,0 +1,5 @@
+{
+  "name": "Editor de Fotos IA",
+  "description": "Sube una imagen, describe los cambios que quieres y deja que la IA la transforme. Mejora automática, modificaciones personalizadas y opciones para compartir.",
+  "requestFramePermissions": []
+}
